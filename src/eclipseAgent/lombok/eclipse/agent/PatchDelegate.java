@@ -51,14 +51,18 @@ import org.eclipse.jdt.internal.compiler.ast.AbstractMethodDeclaration;
 import org.eclipse.jdt.internal.compiler.ast.Annotation;
 import org.eclipse.jdt.internal.compiler.ast.Argument;
 import org.eclipse.jdt.internal.compiler.ast.ArrayInitializer;
+import org.eclipse.jdt.internal.compiler.ast.BinaryExpression;
 import org.eclipse.jdt.internal.compiler.ast.ClassLiteralAccess;
 import org.eclipse.jdt.internal.compiler.ast.CompilationUnitDeclaration;
 import org.eclipse.jdt.internal.compiler.ast.Expression;
 import org.eclipse.jdt.internal.compiler.ast.FieldDeclaration;
 import org.eclipse.jdt.internal.compiler.ast.FieldReference;
+import org.eclipse.jdt.internal.compiler.ast.IfStatement;
 import org.eclipse.jdt.internal.compiler.ast.MemberValuePair;
 import org.eclipse.jdt.internal.compiler.ast.MessageSend;
 import org.eclipse.jdt.internal.compiler.ast.MethodDeclaration;
+import org.eclipse.jdt.internal.compiler.ast.NullLiteral;
+import org.eclipse.jdt.internal.compiler.ast.OperatorIds;
 import org.eclipse.jdt.internal.compiler.ast.ReturnStatement;
 import org.eclipse.jdt.internal.compiler.ast.SingleNameReference;
 import org.eclipse.jdt.internal.compiler.ast.SingleTypeReference;
@@ -698,16 +702,24 @@ public class PatchDelegate {
 				method.arguments[method.arguments.length - 1].type.bits |= ASTNode.IsVarArgs;
 			}
 		}
-		
+
+		boolean useReturn = false;
 		Statement body;
 		if (method.returnType instanceof SingleTypeReference && ((SingleTypeReference)method.returnType).token == TypeConstants.VOID) {
 			body = call;
 		} else {
+			useReturn = true;
 			body = new ReturnStatement(call, source.sourceStart, source.sourceEnd);
 			setGeneratedBy(body, source);
 		}
-		
-		method.statements = new Statement[] {body};
+
+		Statement nullCheckAndReturn = new IfStatement(new BinaryExpression(
+				new NullLiteral(0, 0), delegateReceiver.get(source, name), OperatorIds.EQUAL
+		), new ReturnStatement(
+				useReturn ? new NullLiteral(0, 0) : null, 0, 0
+		), 0, 0);
+
+		method.statements = new Statement[] {nullCheckAndReturn,body};
 		return method;
 	}
 	
